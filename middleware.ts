@@ -24,7 +24,7 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   // / hanteras client-side så att hash-fragment (recovery token) bevaras
-  const isPublicPage = pathname === "/login" || pathname === "/reset-password" || pathname === "/"
+  const isPublicPage = pathname === "/login" || pathname === "/reset-password" || pathname === "/" || pathname === "/admin"
 
   if (!session && !isPublicPage) {
     return NextResponse.redirect(new URL("/login", request.url))
