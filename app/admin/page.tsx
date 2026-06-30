@@ -221,6 +221,7 @@ export default function AdminPage() {
   const [orgs, setOrgs] = useState<Org[]>([])
   const [connections, setConnections] = useState<Connection[]>([])
   const [loading, setLoading] = useState(true)
+  const [authChecked, setAuthChecked] = useState(false)
   const [showNewForm, setShowNewForm] = useState(false)
   const [editingOrg, setEditingOrg] = useState<Org | null>(null)
   const [syncing, setSyncing] = useState<string | null>(null)
@@ -228,7 +229,24 @@ export default function AdminPage() {
   const [inviteStatus, setInviteStatus] = useState<Record<string, { ok: boolean; msg: string }>>({})
   const [inviting, setInviting] = useState<string | null>(null)
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { window.location.href = "/login"; return }
+
+      const { data: memberships } = await supabase
+        .from("user_organizations")
+        .select("role")
+        .eq("user_id", session.user.id)
+
+      const isSuperAdmin = memberships?.some(m => m.role === "super_admin") || false
+      if (!isSuperAdmin) { window.location.href = "/"; return }
+
+      setAuthChecked(true)
+      fetchData()
+    }
+    checkAuth()
+  }, [])
 
   async function inviteUser(orgId: string) {
     const email = inviteEmails[orgId]?.trim()
@@ -304,7 +322,7 @@ export default function AdminPage() {
     }
   }
 
-  if (loading) return (
+  if (!authChecked || loading) return (
     <div className="flex items-center justify-center h-screen bg-gray-950 text-gray-500">Laddar...</div>
   )
 
