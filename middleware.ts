@@ -23,7 +23,8 @@ export async function middleware(request: NextRequest) {
   const { data: { session } } = await supabase.auth.getSession()
 
   const pathname = request.nextUrl.pathname
-  const isPublicPage = pathname === "/login" || pathname === "/reset-password"
+  // / hanteras client-side så att hash-fragment (recovery token) bevaras
+  const isPublicPage = pathname === "/login" || pathname === "/reset-password" || pathname === "/"
 
   if (!session && !isPublicPage) {
     return NextResponse.redirect(new URL("/login", request.url))

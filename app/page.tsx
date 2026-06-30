@@ -23,19 +23,65 @@ export default function Dashboard() {
   const [metrics, setMetrics] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>("Översikt")
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
     async function loadOrgs() {
-      const { data } = await supabase.from("organizations").select("id, name").order("created_at")
-      if (data?.length) {
-        setOrgs(data)
+      // Kolla om det finns ett recovery-token i hashen
+      const hash = window.location.hash
+      if (hash.includes("type=recovery")) {
+        window.location.href = "/reset-password" + hash
+        return
+      }
+
+      // Kontrollera session
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        window.location.href = "/login"
+        return
+      }
+
+      // Hämta användarens org-access
+      const { data: memberships } = await supabase
+        .from("user_organizations")
+        .select("org_id, role")
+        .eq("user_id", session.user.id)
+
+      const isSuper = memberships?.some(m => m.role === "super_admin") || false
+      setIsSuperAdmin(isSuper)
+      setAuthChecked(true)
+
+      // Hämta orgs — super_admin ser alla, övriga bara sina
+      let orgQuery = supabase.from("organizations").select("id, name").order("created_at")
+      const { data } = await orgQuery
+
+      let filteredOrgs = data || []
+      if (!isSuper && memberships?.length) {
+        const allowedIds = memberships.map(m => m.org_id)
+        filteredOrgs = filteredOrgs.filter(o => allowedIds.includes(o.id))
+      }
+
+      if (filteredOrgs.length) {
+        setOrgs(filteredOrgs)
         const saved = localStorage.getItem("selected_org_id")
-        const active = data.find(o => o.id === saved) || data.find(o => o.id === DEFAULT_ORG_ID) || data[0]
+        const active = filteredOrgs.find(o => o.id === saved) || filteredOrgs.find(o => o.id === DEFAULT_ORG_ID) || filteredOrgs[0]
         setOrgId(active.id); setOrgName(active.name)
       }
     }
     loadOrgs()
   }, [])
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    window.location.href = "/login"
+  }
+
+  if (!authChecked) return (
+    <div style={{ minHeight: "100vh", background: "#0f1117", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <p style={{ color: "#666" }}>Laddar...</p>
+    </div>
+  )
 
   useEffect(() => { if (orgId) fetchAll(orgId) }, [orgId])
 
@@ -189,9 +235,14 @@ export default function Dashboard() {
                 {orgs.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}
               </select>
             )}
-            <a href="/admin" className="text-sm text-gray-400 hover:text-white px-4 py-2 rounded-lg border border-gray-700 hover:border-gray-500 transition-colors">
-              Hantera kunder
-            </a>
+            {isSuperAdmin && (
+              <a href="/admin" className="text-sm text-gray-400 hover:text-white px-4 py-2 rounded-lg border border-gray-700 hover:border-gray-500 transition-colors">
+                Hantera kunder
+              </a>
+            )}
+            <button onClick={handleLogout} className="text-sm text-gray-400 hover:text-white px-4 py-2 rounded-lg border border-gray-700 hover:border-gray-500 transition-colors">
+              Logga ut
+            </button>
           </div>
         </div>
       </div>
