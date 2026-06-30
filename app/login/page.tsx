@@ -10,11 +10,12 @@ export default function LoginPage() {
   const [error, setError] = useState("")
 
   useEffect(() => {
-    // Om Supabase skickar hit en recovery-token, vidarebefordra till reset-sidan
-    const hash = window.location.hash
-    if (hash.includes("type=recovery") || (hash.includes("access_token") && hash.includes("recovery"))) {
-      router.push("/reset-password" + hash)
-    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        router.push("/reset-password")
+      }
+    })
+    return () => subscription.unsubscribe()
   }, [])
   const [loading, setLoading] = useState(false)
 

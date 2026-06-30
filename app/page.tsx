@@ -27,14 +27,16 @@ export default function Dashboard() {
   const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
-    async function loadOrgs() {
-      // Kolla om det finns ett recovery-token i hashen
-      const hash = window.location.hash
-      if (hash.includes("type=recovery")) {
-        window.location.href = "/reset-password" + hash
-        return
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        window.location.href = "/reset-password"
       }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
+  useEffect(() => {
+    async function loadOrgs() {
       // Kontrollera session
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
