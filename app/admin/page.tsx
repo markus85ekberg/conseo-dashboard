@@ -223,9 +223,42 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [showNewForm, setShowNewForm] = useState(false)
   const [editingOrg, setEditingOrg] = useState<Org | null>(null)
-  const [syncing, setSyncing] = useState<string | null>(null) // "orgId" while syncing
+  const [syncing, setSyncing] = useState<string | null>(null)
+  const [inviteEmails, setInviteEmails] = useState<Record<string, string>>({})
+  const [inviteStatus, setInviteStatus] = useState<Record<string, { ok: boolean; msg: string }>>({})
+  const [inviting, setInviting] = useState<string | null>(null)
 
   useEffect(() => { fetchData() }, [])
+
+  async function inviteUser(orgId: string) {
+    const email = inviteEmails[orgId]?.trim()
+    if (!email) return
+    setInviting(orgId)
+    setInviteStatus(prev => ({ ...prev, [orgId]: { ok: false, msg: "" } }))
+
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-user`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session?.access_token || ANON_KEY}`,
+      },
+      body: JSON.stringify({ email, org_id: orgId }),
+    })
+    const json = await res.json()
+    if (json.error) {
+      setInviteStatus(prev => ({ ...prev, [orgId]: { ok: false, msg: json.error } }))
+    } else {
+      setInviteStatus(prev => ({ ...prev, [orgId]: {
+        ok: true,
+        msg: json.already_existed
+          ? `${email} är redan registrerad och har nu tillgång.`
+          : `Inbjudan skickad till ${email}!`
+      }}))
+      setInviteEmails(prev => ({ ...prev, [orgId]: "" }))
+    }
+    setInviting(null)
+  }
 
   async function syncAll(org: Org) {
     setSyncing(org.id)
@@ -350,6 +383,33 @@ export default function AdminPage() {
                     </span>
                   )
                 })}
+              </div>
+
+              {/* ── Bjud in användare ─────────────────────────────── */}
+              <div className="mt-4 pt-4 border-t border-gray-800">
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Bjud in användare</p>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    placeholder="info@kund.se"
+                    value={inviteEmails[org.id] || ""}
+                    onChange={e => setInviteEmails(prev => ({ ...prev, [org.id]: e.target.value }))}
+                    onKeyDown={e => e.key === "Enter" && inviteUser(org.id)}
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                  />
+                  <button
+                    onClick={() => inviteUser(org.id)}
+                    disabled={inviting === org.id || !inviteEmails[org.id]?.trim()}
+                    className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    {inviting === org.id ? "Skickar..." : "Bjud in"}
+                  </button>
+                </div>
+                {inviteStatus[org.id]?.msg && (
+                  <p className={`text-xs mt-2 ${inviteStatus[org.id].ok ? "text-green-400" : "text-red-400"}`}>
+                    {inviteStatus[org.id].ok ? "✓" : "✗"} {inviteStatus[org.id].msg}
+                  </p>
+                )}
               </div>
 
               {conns.length < SOURCES.length && (
