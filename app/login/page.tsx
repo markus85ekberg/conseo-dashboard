@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 
@@ -8,6 +8,14 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
+
+  useEffect(() => {
+    // Om Supabase skickar hit en recovery-token, vidarebefordra till reset-sidan
+    const hash = window.location.hash
+    if (hash.includes("type=recovery") || (hash.includes("access_token") && hash.includes("recovery"))) {
+      router.push("/reset-password" + hash)
+    }
+  }, [])
   const [loading, setLoading] = useState(false)
 
   async function handleLogin(e: React.FormEvent) {
