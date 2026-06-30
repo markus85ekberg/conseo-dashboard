@@ -35,6 +35,8 @@ export default function Dashboard() {
     return () => subscription.unsubscribe()
   }, [])
 
+  useEffect(() => { if (orgId) fetchAll(orgId) }, [orgId])
+
   useEffect(() => {
     async function loadOrgs() {
       // Kontrollera session
@@ -84,8 +86,6 @@ export default function Dashboard() {
       <p style={{ color: "#666" }}>Laddar...</p>
     </div>
   )
-
-  useEffect(() => { if (orgId) fetchAll(orgId) }, [orgId])
 
   async function fetchSource(id: string, source: string, since: string): Promise<any[]> {
     const all: any[] = []
